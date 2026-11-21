@@ -1,0 +1,21 @@
+**4 itens resolvidos e 2 parcialmente resolvidos.** Não alterei arquivos nem fiz chamadas de rede. Confirmei os casos abaixo com leitura e simulações em memória; não executei o pytest, pois a suíte grava arquivos temporários.
+
+1. **Alta — Duplicação de publicação (V2): parcialmente resolvido.**  
+   A gravação prévia de PUBLICANDO impede repetir após falha local; resultados incertos ficam VERIFICAR (robo.py:748). Porém, `escrever` lê a pauta sem trava na linha 628 e regrava todas as linhas na linha 664. **Reproduzi:** enquanto aguarda a IA, `publicar` publica outra linha; depois, `escrever` restaura o APROVADO da cópia antiga, permitindo uma segunda publicação. A trava precisa abranger também esse escritor da pauta.
+
+2. **Alta — Vazamento de segredos (V5): parcialmente resolvido.**  
+   Segredos curtos, mascaramento antes do corte e supressão de mensagens de exceções foram corrigidos. Contudo, _resumo_erro, linha 276 aceita objetos dentro de `error.message` e os converte diretamente em texto. **Reproduzi** um objeto contendo `access_token` não cadastrado: o token apareceu integralmente, pois a representação com aspas simples escapa à expressão das linhas 80–81. Ainda falta sanitização de campos sensíveis aninhados.
+
+3. **Alta — Perda do refresh token do X (V8): resolvido.**  
+   O novo token é persistido antes de converter `expires_in` ou verificar a ausência de `access_token` (robo.py:522). Confirmei ambos os cenários malformados em memória.
+
+4. **Média — Renovação do Instagram ausente (V7): resolvido.**  
+   O comando chama a renovação, persiste o token e registra a validade (robo.py:437, linhas 437–460). A consulta apresenta a validade local, na linha 900.
+
+5. **Média — `conferir` renova credenciais: resolvido.**  
+   Usa `renovar=False`; se o token venceu, informa isso sem renovação nem consulta remota (robo.py:904). Confirmei ausência de HTTP nesse cenário.
+
+6. **Média — Lacunas específicas dos testes anteriores: resolvido.**  
+   Foram acrescentados os casos solicitados em test_correcoes.py: falha de gravação nas linhas 19 e 45, mascaramento nas linhas 116 e 122, rotação malformada na linha 167. O ensaio agora verifica retornos e chamadas tentadas em test_robo.py:161. Esses testes não cobrem as duas lacunas remanescentes acima.
+
+Não identifiquei outro problema **novo de gravidade alta** no escopo examinado.

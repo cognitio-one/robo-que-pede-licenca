@@ -1,0 +1,38 @@
+PARECER DE AUDITORIA (Claude) - robo.py, tests/test_robo.py, LEIA-ME.txt, _pedido.txt
+Método: leitura integral do código e dos testes; pytest (57 passed); "publicar --ensaio" (sem rede, sem alteração da pauta); sondas descartáveis em pasta temporária. Nenhum arquivo do robô foi alterado.
+
+VEREDITO
+V1 CONFORME. publicar() só segue se status.strip()=="APROVADO" (robo.py:355-360); enviar() só é chamado em 376, dentro desse fluxo. "publicar-agora" usa a mesma função (547, 560). Maiúscula/minúscula é estrita ("aprovado" não publica).
+V2 CONFORME. PUBLICADO/PUBLICANDO/REVISAR são pulados (355-360). Grava PUBLICANDO antes de enviar (373-375). Erro de envio vira REVISAR (382-384); exceção não prevista deixa PUBLICANDO no disco (569-572). Falha ao salvar após publicar deixa PUBLICANDO (teste 160-174). Nenhum caminho devolve a linha a APROVADO.
+V3 CONFORME. 361-363: com numero=None o LinkedIn é pulado antes de qualquer envio. Só publicar-agora (numero informado) chega a enviar() para LinkedIn. Teste 69-73.
+V4 CONFORME. Ensaio: publicar (369-371), escrever (417-419), conferir (465-484, token_x com renovar=False), autorizar-x (492-494) não chamam rede, IA, renovação nem navegador. "import requests" só dentro de requisitar. Teste 113-129 cobre os cinco comandos, antes e depois do nome do comando.
+V5 CONFORME COM RESSALVA (M2). requisitar() nunca inclui corpo nem URL nas mensagens (205-217); exceção genérica é mascarada (569-572; 448-449); tudo passa por limpar() em avisar() (48-51). Teste 330-344 cobre erro de API com segredo.
+V6 CONFORME COM RESSALVA (M3). Leitura utf-8-sig, ";" , strict (129-138); gravação utf-8-sig, CRLF, aspas automáticas, atômica (143-148, 64-78). Teste 132-138 (acento, ";", aspas, quebra de linha).
+V7 CONFORME COM RESSALVAS BAIXAS. LinkedIn (315-319), Facebook (322-331), Instagram (297, 334-338), X (272, 340) batem com a ficha: endereços, cabeçalhos, campos, 201/x-restli-id, v27.0, Linkedin-Version 202611. Ressalvas na seção baixa.
+V8 NÃO CONFORME EM PARTE (A1). A gravação é a primeira coisa depois da resposta (274), mas a validação em 254-260 pode descartar tokens válidos e uma falha de gravação perde o refresh token.
+V9 CONFORME COM RESSALVAS BAIXAS. pathlib, os.replace, utf-8 no log e no stdout (578-580), CRLF no CSV. Usa is_relative_to (Python 3.9+) e missing_ok (3.8+); LEIA-ME não declara a versão mínima.
+
+PROBLEMAS
+
+GRAVIDADE ALTA
+A1. (V8) Refresh token de uso único pode ser perdido. robo.py:250-263 e 274. O servidor do X já invalidou o refresh antigo quando a resposta chega, mas salvar_tokens_x ainda pode lançar Erro ANTES de gravar: refresh_token ausente na resposta, expires_in inválido (254-260), ou OSError em gravar_atomico (262, convertido em Erro em 74-75, ex.: antivírus ou disco). Nesses casos o novo refresh só existia na memória e se perde; o arquivo continua com o antigo (já inútil). O LEIA-ME admite ("pode ser necessário autorizar novamente"), e o teste 283-298 só prova que não publica. Correção: gravar a resposta crua primeiro (json.dumps do dict recebido, sem validar, com expires_at calculado de forma tolerante) e só depois validar; em caso de falha de gravação, tentar um segundo caminho (x-tokens.json.novo) e mostrar ao usuário o que fazer.
+
+GRAVIDADE MÉDIA
+M1. (V2/V8) Renovação do token do X ocorre depois de marcar PUBLICANDO (373-376, 339 dentro de enviar). Se a renovação falhar por algo inofensivo (rede caída, 400), a linha vira REVISAR sem ter saído, e o usuário precisa investigar à toa; pior, se a renovação consumir o refresh e falhar (A1), o post fica bloqueado. Correção: obter token_x()/token_instagram() ANTES de gravar PUBLICANDO (ou tratar Erro anterior ao POST de publicação como "não enviado" e devolver a APROVADO).
+M2. (V5) Segredo falso por nome de variável. 112: qualquer chave contendo "TOKEN" é protegida, inclusive INSTAGRAM_TOKEN_CRIADO_EM (uma data, ex. "20/11/2026"). Resultado: toda ocorrência dessa data na tela, no log e no TEXTO gravado por escrever (424, limpar(texto)) vira "[SEGREDO OCULTO]", corrompendo posts e o ensaio. Correção: excluir "_CRIADO_EM" (ou só proteger chaves terminadas em _TOKEN, _SECRET, _API_KEY) e nunca aplicar limpar() ao texto de post, só ao log/mensagens.
+M3. (V6/V9) Hora e data rígidas demais para o Excel. 153: exige \d{2}/\d{2}/\d{4} e \d{2}:\d{2}. Se o usuário digitar 9:00 ou 5/11/2026 e o Excel salvar assim, a linha dá erro ("Corrija a data...") e não publica. Seguro (não publica errado), mas incômodo para quem não programa. Correção: aceitar \d{1,2} e normalizar (zfill) ao ler.
+M4. (V7) Limite do X conservador demais. 172-175: caracteres não ASCII contam 2. No X, letras acentuadas do português contam 1 (só emoji/CJK contam 2). Um post válido de 270 caracteres com acentos é rejeitado pelo robô, contra a ficha (280). Correção: contar 1 para code points até U+10FF (intervalos de peso 1 do X) e 2 para o resto; manter aviso.
+
+GRAVIDADE BAIXA
+B1. (V7) autorizar-x: urlencode converte espaço em "+" no escopo (520, 525); a ficha mostra %20. Provavelmente aceito, mas para seguir a ficha use urlencode(params, quote_via=quote).
+B2. (V7) LinkedIn /rest/posts: o campo commentary interpreta caracteres reservados ( ) [ ] { } < > @ | ~ _ * # \ ; texto com esses sinais pode sair truncado ou formatado. Não está na ficha; avisar o titular e, se confirmado na documentação, escapar com barra invertida.
+B3. (V7) Instagram: publica o container logo após criá-lo (336-337), sem consultar o status (FINISHED). Pode falhar com imagem grande; a falha cai em REVISAR (seguro). Fora da ficha; apenas registrar.
+B4. (V6) Texto que começa com = + - @ vira fórmula no Excel (#NOME?) e, ao salvar, corrompe a célula. Ocorre com texto gerado pela IA. Correção: prefixar apóstrofo ao escrever só se o primeiro caractere for um desses, ou orientar no LEIA-ME.
+B5. (V5) autorizar-x, 509: secrets.compare_digest com state não ASCII lança TypeError (confirmado em sonda); o servidor local só imprime o erro no stderr e continua. Correção: comparar com .encode().
+B6. (V9) Instagram renovado reescreve config.env só com "\n" (303) e reordena chaves (301-302); inofensivo no Bloco de Notas moderno, mas altera o arquivo do usuário. Correção: preservar a ordem e o fim de linha.
+B7. (V9) Trava .robo.lock não verifica se o PID ainda existe (83-93); após queda de energia exige apagar à mão (mensagem já orienta).
+B8. (V1) "aprovado" em minúsculas é pulado com aviso genérico (359): o robô poderia dizer "escreva APROVADO em maiúsculas".
+
+OBSERVAÇÕES
+- pytest: 57 passed; ensaio: linha 2 (Facebook) mostrada, linha 3 (LinkedIn) pulada, nenhuma chamada. Os testes não cobrem: perda de refresh em falha de gravação (A1), data/hora com um dígito (M3), valor de config com data protegida (M2), acentos no limite do X (M4).
+- Nada foi lido da internet; a ficha foi tomada como verdadeira, conforme pedido.

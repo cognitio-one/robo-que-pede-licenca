@@ -1,0 +1,41 @@
+**Resultado: 5 pontos conformes e 4 não conformes.** Não alterei arquivos nem fiz chamadas de rede. Li os quatro arquivos solicitados e executei verificações com armazenamento e respostas simulados em memória.
+
+Não executei o pytest original, pois seus testes escrevem arquivos temporários. Os “14 passed” do LEIA-ME são um resultado anterior, não desta auditoria. A comparação das APIs abaixo usa a ficha fornecida.
+
+1. **V1 — Conforme.**  
+   `publicar` seleciona somente APROVADO; `publicar-agora` rejeita qualquer outro status. Os demais comandos não publicam. Examinei robo.py:583, linhas 583–584, 613–618 e 768–777. Os testes cobrem RASCUNHO nos dois comandos: test_robo.py:78, linhas 78–84 e 133–137.
+
+2. **V2 — Não conforme.**  
+   Uma linha **já gravada** como PUBLICADO é bloqueada. Entretanto, o envio acontece antes da gravação: robo.py:555, linhas 555–556 e 560–573. Se o post sair e a gravação falhar — por exemplo, Excel aberto — o arquivo continua APROVADO. **Reproduzi duas publicações simuladas em duas rodadas**, ambas com falha ao salvar. Os testes, linhas 87–116, cobrem apenas persistência bem-sucedida. A garantia de que “uma queda não repete post” em LEIA-ME.txt:45 é incorreta.
+
+3. **V3 — Conforme.**  
+   `publicar` pula LinkedIn antes de chamar a publicação; `publicar-agora` permite o envio aprovado. Examinei robo.py:592, linhas 592–601 e 607–618. Há teste específico em test_robo.py:119, linhas 119–130.
+
+4. **V4 — Conforme.**  
+   As saídas antecipadas do ensaio precedem IA, publicação, conferência remota e autorização OAuth: robo.py:510, linhas 510–514, 552–555, 645–649 e 699–701. Exercitei os cinco comandos com rede, IA e renovação instrumentadas: **zero chamadas e todos retornaram 0**.
+
+5. **V5 — Não conforme.**  
+   O mascaramento descarta segredos menores que seis caracteres e substitui somente valores literais conhecidos: robo.py:57, linhas 57–71. Além disso, `_checar` **trunca antes de mascarar**, podendo expor parte de um token conhecido, na linha 250. Reproduzi ambos os vazamentos com valores fictícios. Erros externos também chegam ao registro nas linhas 520 e 783. O teste de sigilo, linhas 201–215, cobre somente segredos completos conhecidos, sem truncamento.
+
+6. **V6 — Conforme para o formato especificado.**  
+   Examinei leitura com `utf-8-sig`, separador `;`, tratamento CSV de aspas e quebras internas, escrita com BOM e CRLF, e interpretação `%d/%m/%Y %H:%M`: robo.py:142, linhas 142–200. A ida e volta em memória preservou acentos, ponto e vírgula, aspas e texto multilinha. Os testes correspondentes estão nas linhas 159–175. **Não houve validação abrindo e salvando no Excel real.**
+
+7. **V7 — Não conforme no conjunto da ficha.**  
+   Os envios implementados correspondem aos endereços, cabeçalhos e campos fornecidos: versões nas linhas 33–37; LinkedIn 271–306; Facebook 310–327; Instagram 331–352; X 375–428 e OAuth 684–741 de robo.py.  
+   Porém, **falta a renovação do Instagram** indicada em _pedido.txt:50. A omissão é assumida no LEIA-ME, linhas 31–32. Separadamente, `conferir` viola o pedido de uma única chamada somente de leitura: com token X vencido, faz POST de renovação e depois GET, conforme linhas 405–409 e 677–679; confirmei essa sequência por simulação.
+
+8. **V8 — Não conforme.**  
+   A gravação ocorre antes do post e do registro, mas **depois de operações que podem falhar**. `_x_pedir_token` acessa `access_token` e converte `expires_in` antes de retornar para `_x_salvar`: robo.py:389, linhas 389–400. Simulei resposta contendo novo refresh token e `expires_in` inválido: houve `ValueError` e **nenhuma gravação**. O teste nas linhas 218–232 só verifica a renovação bem-sucedida.
+
+9. **V9 — Conforme nos aspectos examinados.**  
+   Caminhos usam `pathlib` e a pasta do script; arquivos têm codificação explícita; CSV usa CRLF sem duplicação; a execução direta configura stdout para UTF-8: robo.py:26, linhas 26, 49–50, 183–191, 318–322 e 788–792. As verificações em memória executaram neste ambiente Windows. O bloqueio pelo Excel tem mensagem própria, mas sua consequência de duplicação está em V2.
+
+**Problemas por gravidade e correções sugeridas:**
+
+- **Alta — Duplicação após envio e falha local (V2).** Persistir uma intenção de envio antes da chamada, bloquear execuções concorrentes e reconciliar resultados incertos; usar idempotência quando disponível, sem repetir automaticamente envios ambíguos.
+- **Alta — Vazamento de segredos (V5).** Evitar registrar corpos e exceções externos brutos; sanitizar campos sensíveis e valores conhecidos antes de truncar, sem limite mínimo de comprimento.
+- **Alta — Perda do refresh token de uso único (V8).** Persistir imediatamente os novos tokens recebidos, antes de converter validade ou processar campos auxiliares; testar falhas após a rotação.
+- **Média — Renovação do Instagram ausente (V7).** Implementar a renovação e persistência previstas na ficha, com controle de validade.
+- **Média — `conferir` renova credenciais.** Usar somente o token existente na consulta; se estiver vencido, informar a necessidade de renovação sem executá-la nesse comando.
+- **Média — Testes deixam passar falhas relevantes.** Acrescentar casos de falha de gravação, rotação com resposta malformada e mascaramento truncado. No teste de ensaio, conferir chamadas e retornos: o `AssertionError` simulado pode ser capturado por `main`, e o teste atual ignora o retorno.
+- **Baixa — Documentação promete proteção inexistente.** Corrigir as garantias nas linhas 38 e 45 do LEIA-ME e orientar reconciliação antes de reaproveitar uma linha cujo envio teve resultado incerto.

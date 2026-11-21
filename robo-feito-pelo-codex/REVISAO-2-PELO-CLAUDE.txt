@@ -1,0 +1,12 @@
+PARECER 2 DE AUDITORIA (Claude) - segunda rodada, somente leitura
+Método: leitura de robo.py (655 linhas) nos trechos dos itens; pytest: 103 passed (tests/test_robo.py + tests/test_revisao.py). Sem rede, sem navegador, nenhum arquivo do robô alterado.
+
+A1 (alta) RESOLVIDO. robo.py:287-309 salvar_tokens_x grava a resposta crua com expires_at tolerante (0 se inválido) ANTES de validar (validar_tokens_x só em 308); falha em x-tokens.json cai em x-tokens.json.novo (303-304); falha nos dois dá orientação (305). 263-264 e 313-315 bloqueiam novo uso/renovação enquanto o .novo existir (não consome outro refresh). Testes a1 em test_revisao.py:16-90. Resíduo aceitável: se os DOIS arquivos falharem, o refresh se perde (inevitável; mensagem orienta reautorizar).
+M1 (média) RESOLVIDO. 442-443: token_x()/token_instagram() obtidos antes de gravar PUBLICANDO (445); enviar recebe token_preparado (448); falha na renovação mantém APROVADO. Teste test_revisao.py:90-146 (uma única renovação).
+M2 (média) RESOLVIDO. 113 exclui "_CRIADO_EM" da proteção; o texto da IA é gravado sem limpar() (497-498). Testes 148-175.
+M3 (média) RESOLVIDO. 141-147 e 162 aceitam 1-2 dígitos e normalizam com zfill; datas inexistentes ainda rejeitadas (strptime, 164-166); ler_pauta não grava em ensaio. Teste 175.
+M4 (média) RESOLVIDO. 183-185: peso 1 até U+10FF e faixas de pontuação; links 23; limite 280. Testes 189-196.
+Baixos: B1, B4, B5, B6, B8 declarados corrigidos com testes (B4 aviso em 499-500; B8 em 426-427); B2, B3, B7 documentados como decisão do autor (aceitável).
+
+PROBLEMA NOVO DE GRAVIDADE ALTA: nenhum encontrado.
+Observação não alta: se x-tokens.json.novo existir, ler_tokens_x (263) bloqueia também o ensaio de conferir/publicar do X com erro; é intencional e a mensagem orienta.

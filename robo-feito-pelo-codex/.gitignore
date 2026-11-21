@@ -1,0 +1,10 @@
+config.env
+*-tokens.json
+*-tokens.json.novo
+registro.log
+.robo.lock
+.robo-*
+__pycache__/
+.pytest_cache/
+.test-tmp/
+*.pyc

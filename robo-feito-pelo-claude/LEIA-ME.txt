@@ -1,0 +1,100 @@
+ROBÔ DE PUBLICAÇÃO EM REDES SOCIAIS - LEIA-ME
+
+PRIMEIROS PASSOS
+1. Instale as bibliotecas (uma vez):   python -m pip install -r requirements.txt
+2. Copie config.exemplo.env para config.env e preencha com as suas chaves.
+3. Edite perfil.txt com o seu estilo e as suas regras de escrita.
+4. Edite pauta.csv no Excel (salve como "CSV UTF-8"). Colunas, nesta ordem:
+   data;hora;rede;tema;texto;imagem;status;resultado
+   data dd/mm/aaaa, hora hh:mm, rede = linkedin, facebook, instagram ou x.
+
+COMANDOS (todos aceitam --ensaio: mostra o que faria, sem chamar nenhuma rede)
+  python robo.py conferir                 confere chaves e se cada rede responde
+  python robo.py escrever                 a IA escreve o texto das linhas com tema e sem texto (status RASCUNHO)
+  (você lê no Excel, corrige e troca o status para APROVADO)
+  python robo.py publicar                 publica as linhas APROVADO cuja data e hora já chegaram (pula o LinkedIn)
+  python robo.py publicar-agora 3         publica a linha 3 agora (a 1 é o cabeçalho; vale para qualquer rede, inclusive LinkedIn)
+  python robo.py autorizar-x              autoriza o X uma única vez (abre o navegador)
+
+REGRAS DE SEGURANÇA
+- Só publica linha APROVADO. Linha PUBLICADO nunca é publicada de novo.
+- LinkedIn nunca sai pelo "publicar" (os termos do LinkedIn proíbem automatizar); só por "publicar-agora".
+- Se uma publicação falhar, a linha vira ERRO e o motivo vai na coluna resultado; corrija e volte para APROVADO.
+- Tudo vai para registro.log. Chaves e tokens são escondidos (***) na tela e no registro.
+- Feche o Excel antes de rodar o robô (senão ele não consegue gravar a planilha).
+- Para o robô rodar "no relógio" (Facebook, Instagram, X), agende "python robo.py publicar" no Agendador de Tarefas do Windows.
+
+AVISOS SOBRE A FICHA TÉCNICA
+- Não consegui conferir a ficha técnica na internet (esta execução foi sem rede). Usei os dados dela como estão
+  (Graph API v27.0, Linkedin-Version 202611, modelos claude-sonnet-5-5 e gpt-6.2-sol). Nada nela me pareceu contraditório,
+  mas confira se uma chamada falhar com mensagem de "versão" ou "modelo".
+- Token do LinkedIn vale 60 dias, sem renovação: gere outro quando vencer.
+- Instagram em app novo da Meta (login unificado, o caminho testado no livro): preencha INSTAGRAM_TOKEN (começa com EAA)
+  e INSTAGRAM_USER_ID (o número embaixo do nome da conta no painel do app). Assim o robô usa graph.facebook.com, espera a
+  imagem ficar pronta antes de publicar e não precisa renovar o token. Em app antigo (login do Instagram, não testado por nós),
+  deixe INSTAGRAM_USER_ID vazio; o token vale 60 dias e se renova com "python robo.py renovar-instagram".
+- A API não apaga post do Instagram: apague pelo aplicativo ou por instagram.com.
+
+DECISÕES TOMADAS SEM PERGUNTAR
+- Número da linha = número da linha no Excel (cabeçalho é a 1, primeira pauta é a 2).
+- Hora = relógio do computador, sem fuso especial.
+- "publicar-agora" também exige status APROVADO e recusa linha PUBLICADO; ignora só a data/hora.
+- Se publicar falhar com recusa clara da rede, a linha recebe status ERRO (e não fica APROVADO), para não tentar de novo sozinha.
+  Se o resultado for incerto (queda de conexão ou erro 5xx durante o envio), a linha fica VERIFICAR: confira na rede.
+- "escrever" só preenche linhas com status vazio ou RASCUNHO, que tenham tema e estejam sem texto.
+- Texto acima do limite da rede (X 280, LinkedIn 3000, Instagram 2200) é recusado na publicação, e avisado ao escrever.
+- Imagem: Facebook aceita endereço público ou arquivo na pasta; Instagram só endereço público https terminado em .jpg/.jpeg;
+  LinkedIn e X ignoram a imagem (com aviso). Instagram sem imagem vira ERRO.
+- "conferir" não chama a IA (para não gastar); só confere se a chave está preenchida. Valores que começam com "cole-" contam como não preenchidos.
+- pauta.csv também é lida se vier em cp1252 (Excel antigo), mas é sempre regravada em UTF-8 com BOM.
+- Antes de enviar, o robô grava PUBLICANDO na planilha; se não conseguir gravar, NÃO envia. Depois do envio grava PUBLICADO.
+  Se essa segunda gravação falhar (Excel aberto), a linha continua PUBLICANDO e o robô nunca a repete; o resultado fica no registro.log.
+- Resultado do X = endereço https://x.com/i/web/status/<id>; nas outras redes, o identificador devolvido pela rede.
+- pytest não está em requirements.txt (que tem só requests, anthropic e openai); para os testes: python -m pip install --user pytest.
+- Os arquivos de exemplo (pauta.csv de duas linhas, perfil.txt) são só exemplos; sem config.env o ensaio de "publicar" funciona mesmo assim.
+
+SAÍDA DE "python -m pytest -q" (primeira versão, 20/11/2026): 14 passed. A saída atual está na seção "Correções após a revisão independente".
+
+SAÍDA DE "python robo.py publicar --ensaio" (pauta de exemplo, duas linhas)
+[ENSAIO] Linha 2: NÃO fiz nenhuma chamada. Mandaria isto:
+  rede: FACEBOOK
+  chamada: POST https://graph.facebook.com/v27.0/<PAGE_ID>/feed
+  imagem: (nenhuma)
+  texto (92 caracteres):
+    | Organização é hábito: separe os documentos do mês numa pasta só.
+Aviso: linha 3 é do LinkedIn e foi PULADA (os termos do LinkedIn proíbem automatizar). Para publicar, rode de propósito: python robo.py publicar-agora 3
+Fim. Simulei 1 linha(s).
+
+CORREÇÕES APÓS A REVISÃO INDEPENDENTE (20/11/2026)
+Uma revisão feita por outro modelo (Codex) achou falhas; todas as de gravidade alta e média foram corrigidas, cada uma com teste novo (test_correcoes.py):
+- Duplicação de post: antes de enviar, o robô grava PUBLICANDO na planilha (se não conseguir, não envia). Se depois do envio a gravação
+  falhar (Excel aberto), a linha fica PUBLICANDO e o resultado vai ao registro.log; nunca volta a APROVADO. Queda de conexão ou erro 5xx
+  durante o envio vira VERIFICAR (o post pode ter saído). Linha PUBLICANDO ou VERIFICAR nunca é publicada sozinha, nem por "publicar-agora":
+  confira na rede e troque o status à mão (PUBLICADO se saiu; APROVADO se não saiu). Um arquivo robo.lock impede duas execuções ao mesmo tempo;
+  se o computador cair no meio, apague robo.lock e confira as linhas PUBLICANDO.
+- Segredos: o registro e a tela nunca mostram o corpo bruto das respostas das redes (só tipo, código e mensagem do erro, já mascarados) nem o
+  texto de exceções. Segredos de qualquer tamanho são escondidos, e o mascaramento acontece antes de cortar o texto.
+- X: o novo refresh token (de uso único) é gravado em x-tokens.json assim que chega, antes de ler a validade ou conferir o resto da resposta.
+- Instagram: novo comando "python robo.py renovar-instagram" (aceita --ensaio): chama refresh_access_token, grava o token no config.env e a
+  validade em instagram-validade.json. "conferir" mostra quantos dias faltam. Rode a cada ~50 dias; token já vencido não renova (gere outro).
+- "conferir" agora só lê: não renova o token do X (se o de acesso venceu, avisa que o robô renova sozinho ao publicar).
+- Testes: o teste do ensaio agora confere o retorno de cada comando e que nenhuma chamada foi tentada; novos testes de falha ao gravar, queda
+  no envio, mascaramento curto/truncado, rotação do X com resposta malformada, renovação do Instagram e "conferir" sem renovar.
+- Terceira rodada: "escrever" (que também grava a pauta) usa o mesmo robo.lock durante todo o ciclo, então um "publicar" feito enquanto
+  ele espera a IA é barrado em vez de ter o status restaurado. Erros da rede com objetos aninhados (error.message) têm os campos
+  sensíveis (token, secret, key, verifier...) trocados por *** antes de virar texto, e o mascaramento cobre também aspas simples.
+- Não corrigido (baixo): validação em Excel real não foi feita.
+
+SAÍDA DE "python -m pytest -q" (após as correções)
+.............................                                            [100%]
+32 passed (terceira rodada)
+
+SAÍDA DE "python robo.py publicar --ensaio" (após as correções)
+[ENSAIO] Linha 2: NÃO fiz nenhuma chamada. Mandaria isto:
+  rede: FACEBOOK
+  chamada: POST https://graph.facebook.com/v27.0/<PAGE_ID>/feed
+  imagem: (nenhuma)
+  texto (92 caracteres):
+    | Organização é hábito: separe os documentos do mês numa pasta só.
+Aviso: linha 3 é do LinkedIn e foi PULADA (os termos do LinkedIn proíbem automatizar). Para publicar, rode de propósito: python robo.py publicar-agora 3
+Fim. Simulei 1 linha(s).

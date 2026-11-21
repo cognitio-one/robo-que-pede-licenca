@@ -1,0 +1,10 @@
+config.env
+x-tokens.json
+x-tokens.json.tmp
+registro.log
+pauta.csv.tmp
+__pycache__/
+.pytest_cache/
+robo.lock
+config.env.tmp
+instagram-validade.json

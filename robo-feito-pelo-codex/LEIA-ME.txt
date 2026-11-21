@@ -1,0 +1,213 @@
+ROBÔ DE PUBLICAÇÃO — GUIA RÁPIDO
+
+Tudo fica nesta pasta. A entrega contém apenas exemplos, sem chaves reais.
+Nenhuma rede social nem IA foi acessada nesta execução. Não houve navegador.
+
+1. PREPARAR
+Use Python 3.9 ou mais recente.
+Abra um terminal nesta pasta. Para uso real, instale as dependências:
+  python -m pip install --user -r requirements.txt
+Você também pode instalar só requests e a IA escolhida:
+  python -m pip install --user requests anthropic
+  ou: python -m pip install --user requests openai
+Para os testes: python -m pip install --user pytest requests
+
+Edite config.env no Bloco de Notas: troque os valores COLE_/SEU_/PREENCHA.
+config.exemplo.env é o modelo para criar outro config.env, se necessário.
+Escolha IA=claude ou IA=openai e preencha a respectiva chave e modelo.
+Os modelos e versões seguem a ficha fornecida, sem verificação externa.
+Se seu painel não oferecer o modelo/versão indicado, confirme na documentação
+oficial antes de mudar; o robô não escolhe substitutos automaticamente.
+Edite perfil.txt com seu estilo, suas preferências e suas proibições.
+
+2. PREENCHER AS REDES QUE VAI USAR
+LinkedIn: token do perfil pessoal pelo Token Generator:
+https://www.linkedin.com/developers/tools/oauth/token-generator
+No app, habilite Share on LinkedIn e Sign In with LinkedIn using OpenID
+Connect; escopos openid, profile e w_member_social. Cole em
+LINKEDIN_ACCESS_TOKEN. Segundo a ficha, vence em 60 dias, sem renovação
+automática; gere outro quando vencer. O robô consulta seu autor sozinho.
+
+Facebook: use uma Página, não perfil pessoal. No Explorador da Graph API
+(https://developers.facebook.com/tools/explorer), autorize pages_manage_posts
+e pages_read_engagement. Consulte /me/accounts para obter o id e o token
+da Página. Preencha FACEBOOK_PAGE_ID e FACEBOOK_PAGE_ACCESS_TOKEN.
+
+Instagram: conta profissional. Apps novos da Meta usam a configuração da
+API com login unificado (veja o livro, degrau 3, E4): app ligado a um
+portfólio empresarial, sua conta como Testador do Instagram, configuração
+criada pelo modelo e Gerar token no painel. Preencha INSTAGRAM_ACCESS_TOKEN
+(começa com EAA) e INSTAGRAM_USER_ID (o número embaixo do nome da conta no
+painel). Nesse modo o robô usa graph.facebook.com, espera a imagem ficar
+pronta antes de publicar e não renova o token (a tela da Meta diz que ele
+nunca expira; se parar de funcionar, gere outro no painel).
+Apps antigos (login do Instagram, não testado por nós): deixe
+INSTAGRAM_USER_ID vazio e preencha INSTAGRAM_TOKEN_CRIADO_EM (dd/mm/aaaa);
+o robô renova o token de 60 dias ao publicar depois de 45 dias.
+A foto precisa ser JPEG num endereço público. A API não apaga post do
+Instagram: apague pelo aplicativo ou por instagram.com.
+
+X: crie app em https://console.x.com com Read and write e callback exato:
+http://127.0.0.1:8080/callback
+Preencha X_CLIENT_ID; X_CLIENT_SECRET só para app confidencial, senão vazio.
+Quando estiver presente e quiser autorizar de verdade, execute:
+  python robo.py autorizar-x
+Esse comando abre o navegador, espera até 3 minutos e salva x-tokens.json.
+Os escopos incluem offline.access. A publicação renova o acesso vencido e
+salva imediatamente a resposta com o novo refresh token de uso único, antes
+de validar seus campos. Se a gravação principal falhar, tenta salvar em
+x-tokens.json.novo e não envia o post. Enquanto esse arquivo existir, o robô
+bloqueia novas trocas de token para não reutilizar o refresh antigo.
+Para recuperar: feche o robô, resolva a permissão da pasta e substitua
+x-tokens.json por x-tokens.json.novo (renomeie o .novo para x-tokens.json,
+substituindo o antigo). Não compartilhe esses arquivos. Se os dois caminhos
+de gravação falharem, corrija a pasta e execute autorizar-x novamente.
+Respostas com campos inválidos também ficam salvas, mas não são usadas;
+a mensagem orienta a autorizar novamente com offline.access.
+Publicar no X é cobrado: a ficha informa US$ 0,015 por post ou US$ 0,20 com
+link em 20/11/2026. Confira o preço no painel antes de usar de verdade.
+
+3. EDITAR A PAUTA E REVISAR
+Abra pauta.csv no Excel. Preserve as oito colunas nesta ordem:
+data;hora;rede;tema;texto;imagem;status;resultado
+Use data dd/mm/aaaa, hora hh:mm e rede linkedin, facebook, instagram ou x.
+Datas e horas com um dígito, como 5/1/2026 e 9:00, também são aceitas e
+normalizadas na leitura. Datas impossíveis continuam sendo recusadas.
+Salve com separador ponto e vírgula e UTF-8 com BOM. Ao reabrir o arquivo,
+confira se as oito colunas ficaram separadas. O robô preserva acentos,
+aspas, ponto e vírgula dentro de campos e quebras de linha no texto.
+Feche o Excel antes de executar o robô; reabra depois para ver os resultados.
+Não edite a pauta durante a execução: o robô precisa salvar o arquivo inteiro.
+
+Para gerar rascunhos, escreva tema e deixe texto vazio:
+  python robo.py escrever --ensaio
+  python robo.py escrever
+O ensaio mostra o pedido completo à IA; não inventa um texto de resposta.
+A execução real salva texto com status RASCUNHO. Revise no Excel e só então
+mude o status para APROVADO (em maiúsculas). PUBLICADO nunca é reenviado.
+Se um texto começar com =, +, - ou @, o Excel pode entendê-lo como fórmula.
+O comando escrever avisa, sem acrescentar caracteres ao post. Nesse caso,
+importe o CSV pelo menu Dados > De Texto/CSV e defina a coluna texto como
+Texto antes de carregar (use Transformar Dados, se necessário). Confira que
+o conteúdo permaneceu literal antes de salvar; evite abrir por duplo clique.
+
+4. CONFERIR E PUBLICAR
+  python robo.py conferir --ensaio
+  python robo.py conferir
+Conferir informa chaves ausentes e faz no máximo uma consulta GET por rede
+configurada. Não publica, não chama IA e não renova tokens. Se o token do X
+venceu, informa isso: a renovação acontece na próxima publicação.
+Responder à consulta não prova que a rede permitirá publicar.
+
+  python robo.py publicar --ensaio
+  python robo.py publicar
+Publicar envia somente APROVADO com data/hora já alcançadas. LinkedIn é
+sempre pulado nesse comando, conforme a regra solicitada. Não existe um
+serviço rodando em segundo plano: o comando verifica a pauta ao ser executado.
+
+Para enviar uma linha por sua iniciativa, inclusive LinkedIn:
+  python robo.py publicar-agora 3 --ensaio
+  python robo.py publicar-agora 3
+O número é o do Excel: cabeçalho = 1; primeiro post = 2; segundo post = 3.
+Publicar-agora ignora a data/hora, mas ainda exige APROVADO.
+Todos os comandos aceitam --ensaio antes ou depois do nome do comando.
+Ensaio só mostra o plano e escreve registro.log: não altera pauta ou tokens,
+não chama IA/redes, não abre navegador e não inicia servidor de autorização.
+
+5. SE DER PROBLEMA
+Leia a mensagem no terminal e registro.log. Chaves conhecidas são ocultadas;
+respostas brutas e detalhes internos de exceções nunca são exibidos.
+Não compartilhe config.env, x-tokens.json, x-tokens.json.novo nem o registro (que pode conter
+textos dos ensaios). .gitignore exclui configurações, tokens e registro.
+PUBLICANDO significa envio iniciado; REVISAR significa falha durante o envio.
+Falhas na preparação/renovação dos tokens de X ou Instagram mantêm APROVADO,
+pois o envio ainda não começou. Corrija a causa indicada antes de repetir.
+Nesses dois casos, confira a rede antes de tentar de novo. Se o post existe,
+marque PUBLICADO e copie seu identificador/endereço para resultado. Se tiver
+certeza de que não saiu, corrija o problema e volte a APROVADO. O robô não
+repete esses envios sozinho: uma interrupção pode ocorrer depois de publicar.
+Se houver trava antiga, confirme que nenhum robô está rodando antes de apagar
+.robo.lock. Não execute duas cópias do robô ao mesmo tempo.
+
+Decisões tomadas sem perguntar
+- As condições desta execução prevalecem: sem perguntas, chamadas reais ou
+  navegador. Só foram usados arquivos desta pasta, ensaios e testes simulados.
+- Mantive os modelos, versões e endpoints da ficha. Não consultei sites.
+- Usei o horário local do computador; ajuste o Windows para seu fuso antes
+  de publicar. A execução não instala um agendamento automático.
+- A pauta de exemplo tem dois posts APROVADO com datas passadas: Facebook
+  para mostrar o envio simulado e LinkedIn para mostrar o bloqueio automático.
+  Substitua os exemplos antes de preencher chaves e usar comandos reais.
+- Para LinkedIn e X, esta versão aceita apenas texto, conforme os fluxos da
+  ficha; imagem preenchida causa erro, para não ser descartada silenciosamente.
+- Facebook aceita URL pública ou arquivo dentro desta pasta. Instagram exige
+  URL http(s) terminada em .jpg/.jpeg (pode ter parâmetros depois de ?).
+  Isso é uma verificação local: a plataforma ainda precisa conseguir baixar
+  uma imagem que seja realmente JPEG. Não basta mudar a extensão do arquivo.
+- No X, links contam 23 e acentos portugueses contam 1. Os intervalos de
+  peso 1 são U+0000–U+10FF, U+2000–U+200D, U+2010–U+201F e U+2032–U+2037;
+  os demais pontos de código contam 2. A conta local ainda é aproximada
+  para emojis compostos, acentos decompostos e identificação de URLs.
+- PUBLICANDO/REVISAR e uma trava local evitam repetição automática após falhas.
+  Em uma falha de rede, só conferir a plataforma resolve a incerteza do envio.
+- No modo antigo do Instagram, o token é renovado ao publicar após 45 dias. Conferir permanece
+  estritamente de leitura e a IA só tem presença de chave/modelo conferida.
+- A planilha é substituída de forma atômica a cada resultado, sem cópias de
+  segurança automáticas. Guarde uma cópia da pauta se precisar de histórico.
+- Testes e arquivos temporários do pytest ficam em .test-tmp nesta pasta.
+- B2/B3: mantive o payload do LinkedIn e o fluxo de duas etapas do Instagram
+  da ficha, sem consulta externa. O parecer alerta para caracteres reservados
+  no LinkedIn e para imagens do Instagram ainda em processamento. Confira o
+  resultado na rede em uso real; uma falha de envio continua exigindo revisão.
+- B4: preferi orientar a importação como Texto e avisar sobre fórmulas, sem
+  inserir um apóstrofo que poderia acabar publicado junto com o conteúdo.
+- B7: mantive a remoção manual de trava antiga. Detectar apenas um PID não
+  distingue com segurança outro processo que tenha reutilizado o mesmo número.
+
+Correções após a revisão independente
+- CSV do Excel: leitura em UTF-8 com ou sem BOM, com fallback para cp1252; regravação sempre em UTF-8 com BOM, com teste de acentos.
+- A1: resposta de tokens do X salva antes da validação, prazo calculado de
+  modo tolerante e arquivo x-tokens.json.novo como segunda tentativa. Uma
+  recuperação pendente bloqueia o uso do token antigo. Os dois arquivos têm
+  seus tokens ocultados na tela/log; o .novo também está no .gitignore.
+- M1: tokens de X/Instagram preparados antes de PUBLICANDO e reutilizados
+  no envio, sem uma segunda renovação. Falha nessa etapa mantém APROVADO.
+  Depois de iniciado o envio, permanecem as proteções PUBLICANDO/REVISAR.
+- M2: INSTAGRAM_TOKEN_CRIADO_EM não é segredo. Texto gerado é preservado
+  integralmente na pauta; a ocultação de credenciais continua nas mensagens.
+- M3: datas/horas de um dígito aceitas e normalizadas, sem alterar o arquivo
+  durante o ensaio e sem aceitar datas ou horas inexistentes.
+- M4: contagem do X corrigida para os intervalos de peso 1, incluindo os
+  acentos portugueses; links continuam valendo 23 e o limite continua 280.
+- B1/B5: escopos OAuth usam %20; state não ASCII é recusado com HTTP 400,
+  sem interromper o callback. Autorização e navegador só foram simulados.
+- B4: aviso de possível fórmula ao gerar rascunho e orientação de importação
+  no Excel, preservando o texto exato para publicação.
+- B6: renovação do Instagram preserva ordem das chaves, comentários, linhas
+  vazias, BOM, fim de linha e ausência de quebra final de config.env.
+- B8: status aprovado em minúsculas recebe instrução explícita para usar
+  APROVADO em maiúsculas e continua sem autorização para publicar.
+- Documentei Python mínimo 3.9 e as decisões sobre B2, B3 e B7 acima.
+- Testes de regressão em tests/test_revisao.py e no teste OAuth existente.
+  Antes das correções: 37 falhas e 62 aprovações. Casos adicionais cobrem
+  recuperação, falhas HTTP/conexão e ocultação de tokens no ensaio.
+  Todos os testes bloqueiam rede e navegador; chamadas necessárias são
+  simuladas. As saídas finais desta revisão constam abaixo.
+
+VERIFICAÇÃO FINAL
+As saídas dos dois comandos obrigatórios após as correções estão abaixo.
+
+python -m pytest -q
+........................................................................ [ 69%]
+...............................                                          [100%]
+103 passed in 1.33s
+
+python robo.py publicar --ensaio
+Iniciando publicar; ensaio=sim.
+ENSAIO — linha 2; rede: facebook
+Texto exato:
+Uma pequena ação por dia faz diferença; qual será a sua hoje?
+Imagem: (sem imagem)
+Nenhuma chamada será feita; a planilha permanece igual.
+Linha 3: LinkedIn pulado. Para enviar por sua iniciativa, use publicar-agora 3.
+Ensaio concluído: 1 linha(s); 0 erro(s).

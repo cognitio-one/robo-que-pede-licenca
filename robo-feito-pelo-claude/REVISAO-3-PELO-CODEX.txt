@@ -1,0 +1,7 @@
+1. **Duplicação pelo comando `escrever`: resolvido.** A mesma trava de publicação agora cobre leitura, espera pela IA e gravação da pauta: robo.py:653. O modo ensaio não grava a pauta.
+
+2. **Segredos aninhados em `_resumo_erro`: resolvido.** Campos sensíveis são limpos recursivamente antes da conversão em texto: robo.py:279, com aplicação em robo.py:298. O mascaramento também contempla aspas simples.
+
+Não identifiquei problema **novo de gravidade alta** no escopo desses dois itens.
+
+Validação por leitura e verificações em memória; sem alterações de arquivos ou chamadas de rede. Não executei pytest.
